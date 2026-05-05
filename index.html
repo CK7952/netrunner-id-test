@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>《矩阵潜袭》特性卡测试 v0.1</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  background:#070708; color:#e8e8e8;
+  font-family:'Consolas','SF Mono','Courier New','Microsoft YaHei',monospace;
+  min-height:100vh;
+}
+body {
+  padding:32px 16px 80px; line-height:1.65;
+  /* 扫描线（scanline）—— 极细的横向条纹，强化 CRT/赛博朋克氛围 */
+  background-image:
+    linear-gradient(180deg, rgba(255,255,255,.012) 50%, transparent 50%);
+  background-size:100% 3px;
+  background-attachment:fixed;
+  position:relative;
+}
+/* 网格底纹 */
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:-1;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 31px, rgba(255,255,255,.025) 31px 32px),
+    repeating-linear-gradient(90deg, transparent 0 31px, rgba(255,255,255,.025) 31px 32px);
+}
+#app { max-width:880px; margin:0 auto; position:relative; }
+
+/* ===== 配色：黑底 + 单一青色霓虹 ===== */
+:root {
+  --bg:#070708;
+  --panel:rgba(255,255,255,.025);
+  --border:rgba(255,255,255,.15);
+  --border-strong:rgba(255,255,255,.4);
+  --text:#fff;
+  --text-dim:#aaa;
+  --muted:#666;
+  --accent:#0ff;
+  --accent-glow:rgba(0,255,255,.45);
+  --danger:#ff2050;
+  /* 派系色统一为白，由青色辉光承担"赛博"识别度 */
+  --HB:#fff; --JI:#fff; --NB:#fff; --WE:#fff;
+  --AN:#fff; --CR:#fff; --SH:#fff;
+  --corp:#fff;
+  --runner:var(--accent);
+}
+
+h1,h2,h3,h4 { font-family:inherit; font-weight:normal; letter-spacing:.05em; }
+
+/* ===== 屏幕切换 ===== */
+.screen { display:none; animation:fadein .25s ease; }
+.screen.active { display:block; }
+@keyframes fadein { from {opacity:0;} to {opacity:1;} }
+
+/* 通用四角刻线（赛博 HUD 边框） */
+.cyber-frame { position:relative; border:1px solid var(--border-strong); }
+.cyber-frame::before, .cyber-frame::after {
+  content:''; position:absolute; width:14px; height:14px; border:1px solid var(--accent);
+  pointer-events:none;
+}
+.cyber-frame::before { top:-1px; left:-1px; border-right:none; border-bottom:none; }
+.cyber-frame::after  { bottom:-1px; right:-1px; border-left:none; border-top:none; }
+
+/* ===== 标题屏 ===== */
+#title-screen {
+  text-align:center; padding:60px 32px 48px; margin-top:48px;
+  border:1px solid var(--border-strong); position:relative;
+}
+#title-screen::before, #title-screen::after {
+  content:''; position:absolute; width:18px; height:18px; border:1px solid var(--accent);
+  pointer-events:none;
+}
+#title-screen::before { top:-1px; left:-1px; border-right:none; border-bottom:none; }
+#title-screen::after  { bottom:-1px; right:-1px; border-left:none; border-top:none; }
+
+#title-screen h1 {
+  font-size:3em; letter-spacing:.45em; color:#fff; padding-left:.45em;
+  margin-bottom:18px;
+  text-shadow:
+    0 0 14px var(--accent-glow),
+    -2px 0 0 rgba(255,0,80,.32),
+     2px 0 0 rgba(0,255,255,.32);
+}
+#title-screen h2 {
+  font-size:.9em; color:var(--accent); margin-bottom:14px;
+  letter-spacing:.4em; opacity:.9;
+}
+#title-screen .subtitle {
+  color:var(--text-dim); margin-bottom:36px;
+  font-size:.92em; letter-spacing:.05em;
+}
+#title-screen .subtitle::before { content:'> '; color:var(--accent); }
+#title-screen .meta {
+  color:var(--muted); font-size:.78em; margin-top:28px; line-height:1.95;
+  letter-spacing:.05em;
+}
+#title-screen .meta::before { content:'// '; color:var(--accent); opacity:.6; }
+
+/* ===== 按钮 ===== */
+.btn-primary {
+  background:transparent; color:var(--accent);
+  border:1px solid var(--accent);
+  padding:14px 40px; font-size:.95em;
+  letter-spacing:.4em; cursor:pointer;
+  font-family:inherit; text-transform:uppercase;
+  transition: all .15s; position:relative;
+}
+.btn-primary::before { content:'>> '; }
+.btn-primary::after { content:' <<'; }
+.btn-primary:hover {
+  background:var(--accent); color:#000;
+  box-shadow:0 0 24px var(--accent-glow);
+}
+
+/* ===== 题目屏 ===== */
+.quiz-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.phase-label { display:none; }
+.progress-text {
+  color:var(--accent); font-size:.85em; letter-spacing:.18em;
+}
+.progress-text::before { content:'['; opacity:.6; }
+.progress-text::after { content:']'; opacity:.6; }
+.progress-bar {
+  height:2px; background:rgba(255,255,255,.06);
+  overflow:hidden; margin-bottom:48px;
+}
+.progress-fill {
+  height:100%; background:var(--accent);
+  box-shadow:0 0 8px var(--accent-glow);
+  transition: width .3s;
+}
+
+.question-text {
+  font-size:1.35em; line-height:1.55; margin:32px 0 28px;
+  color:#fff; padding-left:24px; position:relative;
+  font-family:'Microsoft YaHei','PingFang SC',sans-serif;
+  font-weight:normal;
+}
+.question-text::before {
+  content:'>'; position:absolute; left:0; top:0;
+  color:var(--accent); font-family:'Consolas',monospace;
+}
+
+.options { display:flex; flex-direction:column; gap:10px; }
+.option {
+  background:transparent; border:1px solid var(--border);
+  padding:18px 22px; cursor:pointer; transition: all .12s;
+  font-size:.98em; color:var(--text-dim);
+  position:relative; overflow:hidden;
+  font-family:'Microsoft YaHei','PingFang SC',sans-serif;
+}
+.option::before {
+  content:''; position:absolute; left:0; top:0; bottom:0; width:0;
+  background:var(--accent); transition:width .12s;
+}
+.option:hover {
+  background:rgba(0,255,255,.04); border-color:var(--accent);
+  color:#fff;
+}
+.option:hover::before { width:3px; }
+.option .opt-mark {
+  display:inline-block; padding:0 6px;
+  color:var(--accent); margin-right:14px;
+  font-family:'Consolas',monospace; font-weight:bold;
+}
+.option .opt-mark::before { content:'['; }
+.option .opt-mark::after  { content:']'; }
+
+/* ===== 结果屏 ===== */
+.result-summary {
+  text-align:center; margin-bottom:32px; padding:32px 24px;
+  border:1px solid var(--border-strong); position:relative;
+}
+.result-summary::before, .result-summary::after {
+  content:''; position:absolute; width:14px; height:14px; border:1px solid var(--accent);
+  pointer-events:none;
+}
+.result-summary::before { top:-1px; left:-1px; border-right:none; border-bottom:none; }
+.result-summary::after  { bottom:-1px; right:-1px; border-left:none; border-top:none; }
+
+.side-badge {
+  display:inline-block; padding:5px 22px; font-size:.85em;
+  letter-spacing:.4em; margin-bottom:18px;
+  border:1px solid var(--border-strong); color:var(--text);
+  background:transparent;
+}
+.side-badge::before { content:'< '; opacity:.5; }
+.side-badge::after { content:' >'; opacity:.5; }
+.side-badge.corp   { color:#fff; border-color:rgba(255,255,255,.55); }
+.side-badge.runner { color:var(--accent); border-color:var(--accent); box-shadow:0 0 14px var(--accent-glow); }
+
+.faction-badge {
+  font-size:1.7em; letter-spacing:.18em; margin-top:8px;
+  color:#fff; text-shadow:0 0 14px var(--accent-glow);
+}
+
+.top-card-wrap {
+  border:1px solid var(--border-strong); padding:32px 24px;
+  margin-bottom:32px; position:relative;
+  background:linear-gradient(180deg, transparent, rgba(0,255,255,.015));
+}
+.top-card-wrap::before, .top-card-wrap::after {
+  content:''; position:absolute; width:14px; height:14px; border:1px solid var(--accent);
+  pointer-events:none;
+}
+.top-card-wrap::before { top:-1px; left:-1px; border-right:none; border-bottom:none; }
+.top-card-wrap::after  { bottom:-1px; right:-1px; border-left:none; border-top:none; }
+
+.top-card-wrap h3 {
+  color:var(--accent); margin-bottom:24px; letter-spacing:.3em;
+  font-size:.85em;
+}
+.top-card-wrap h3::before { content:'>> '; }
+
+.card-display { display:flex; gap:28px; align-items:flex-start; flex-wrap:wrap; }
+.card-image-wrap {
+  flex:0 0 240px; min-height:340px;
+  background:#000; border:1px solid var(--border);
+  overflow:hidden; display:flex; align-items:center; justify-content:center;
+  position:relative;
+}
+.card-image-wrap::after {
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background:
+    linear-gradient(180deg, transparent 95%, rgba(0,255,255,.18) 100%),
+    repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,.08) 2px 3px);
+}
+.card-image-wrap img { width:100%; display:block; }
+.card-image-fallback { color:var(--muted); padding:40px 20px; text-align:center; font-size:.85em; line-height:1.7; }
+
+.card-info { flex:1; min-width:280px; }
+.card-name {
+  font-size:1.25em; color:#fff; margin-bottom:6px; letter-spacing:.05em;
+  font-family:'Microsoft YaHei','PingFang SC',sans-serif;
+}
+.card-name-en {
+  font-size:.85em; color:var(--muted); font-style:normal;
+  margin-bottom:18px; letter-spacing:.05em;
+}
+.card-name-en::before { content:'// '; color:var(--accent); opacity:.5; }
+
+.card-banned {
+  display:inline-block; background:transparent; color:var(--danger);
+  border:1px solid var(--danger);
+  padding:1px 8px; font-size:.7em; margin-left:10px;
+  vertical-align:middle; letter-spacing:.15em;
+  font-family:'Consolas',monospace;
+}
+.card-prob {
+  display:inline-block; background:transparent; color:var(--accent);
+  border:1px solid var(--accent);
+  padding:1px 8px; font-size:.7em; margin-left:10px;
+  vertical-align:middle; letter-spacing:.1em;
+  font-family:'Consolas',monospace;
+}
+.card-prob.rare { color:#ffba00; border-color:#ffba00; }
+
+.card-fp {
+  display:grid; grid-template-columns: 90px 1fr 36px;
+  gap:10px 14px; margin:20px 0; align-items:center;
+  padding:18px 0;
+  border-top:1px dashed var(--border); border-bottom:1px dashed var(--border);
+}
+.fp-label { color:var(--muted); font-size:.8em; letter-spacing:.1em; }
+.fp-bar {
+  height:6px; background:rgba(255,255,255,.05); position:relative;
+}
+.fp-fill {
+  height:100%; background:var(--accent);
+  box-shadow:0 0 4px var(--accent-glow);
+}
+.fp-val {
+  color:var(--accent); text-align:right; font-size:.8em; letter-spacing:.05em;
+  font-family:'Consolas',monospace;
+}
+
+.card-blurb {
+  color:var(--text-dim); font-size:.92em; line-height:1.85;
+  padding:14px 16px; background:rgba(255,255,255,.02);
+  border-left:2px solid var(--accent); margin-top:16px;
+  font-family:'Microsoft YaHei','PingFang SC',sans-serif;
+}
+
+h3.alt-title {
+  color:var(--text-dim); font-size:.85em; letter-spacing:.4em;
+  margin:40px 0 18px; padding-bottom:10px;
+  border-bottom:1px solid var(--border);
+}
+h3.alt-title::before { content:'-- '; color:var(--accent); }
+h3.alt-title::after  { content:' --'; color:var(--accent); }
+
+.alt-cards { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.alt-card {
+  background:rgba(255,255,255,.02); border:1px solid var(--border);
+  padding:18px; display:flex; gap:14px;
+  transition:border-color .15s;
+}
+.alt-card:hover { border-color:var(--accent); }
+.alt-card-img {
+  flex:0 0 100px; height:140px; background:#000;
+  border:1px solid var(--border); overflow:hidden; position:relative;
+}
+.alt-card-img img { width:100%; display:block; }
+.alt-card-info { flex:1; min-width:0; }
+.alt-card-info .card-name { font-size:1em; }
+.alt-card-info .card-name-en { font-size:.75em; }
+.alt-card-info .alt-tag {
+  font-size:.8em; color:var(--muted); margin-top:10px; line-height:1.65;
+  font-family:'Microsoft YaHei','PingFang SC',sans-serif;
+}
+
+.dim-vector {
+  margin-top:32px; padding:20px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.015);
+}
+.dim-vector summary {
+  cursor:pointer; color:var(--text-dim);
+  letter-spacing:.2em; font-size:.85em;
+  list-style:none;
+}
+.dim-vector summary::-webkit-details-marker { display:none; }
+.dim-vector summary::before { content:'[+] '; color:var(--accent); }
+.dim-vector[open] summary::before { content:'[-] '; }
+.dim-vector summary:hover { color:#fff; }
+
+.dim-display {
+  margin-top:18px; display:grid;
+  grid-template-columns: 90px 1fr 40px; gap:8px 14px; align-items:center;
+}
+
+.dim-explain {
+  margin-top:24px; padding-top:20px;
+  border-top:1px dashed var(--border);
+  color:var(--text-dim); font-size:.88em; line-height:1.85;
+  font-family:'Microsoft YaHei','PingFang SC',sans-serif;
+}
+.dim-explain h4 {
+  color:var(--accent); margin:14px 0 10px;
+  letter-spacing:.2em; font-size:.85em;
+  font-family:'Consolas',monospace;
+}
+.dim-explain ul, .dim-explain ol { margin-left:1.4em; }
+.dim-explain li { margin:4px 0; }
+.dim-explain code, .dim-explain b {
+  color:var(--accent); font-weight:normal;
+  font-family:'Consolas',monospace;
+}
+.dim-explain .dim-note {
+  margin-top:14px; padding:12px 14px;
+  background:rgba(0,255,255,.04);
+  border-left:2px solid var(--accent); color:var(--text);
+}
+
+.actions { text-align:center; margin-top:48px; }
+.btn-secondary {
+  background:transparent; color:var(--muted);
+  border:1px solid var(--border); padding:10px 28px;
+  cursor:pointer; margin-left:12px;
+  font-family:inherit; font-size:.9em; letter-spacing:.2em;
+}
+.btn-secondary:hover { color:#fff; border-color:#fff; }
+
+@media (max-width:640px) {
+  body { padding:20px 12px 60px; }
+  #title-screen { padding:48px 20px 36px; margin-top:24px; }
+  #title-screen h1 { font-size:2.2em; letter-spacing:.3em; padding-left:.3em; }
+  .question-text { font-size:1.15em; }
+  .card-display { flex-direction:column; }
+  .card-image-wrap { flex:none; width:100%; max-width:240px; margin:0 auto; }
+  .alt-cards { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ============ 标题屏 ============ -->
+<div id="title-screen" class="screen active">
+  <h1>矩阵潜袭</h1>
+  <h2>NSG STANDARD · 特性卡测试</h2>
+  <p class="subtitle">通过 18 个问题，找到属于你的那张身份卡</p>
+  <button class="btn-primary" onclick="start()">开始测试</button>
+  <p class="meta">
+    基于 26.05 Standard Format 卡池<br>
+    含 46 张特性卡（3 张当前禁牌仍可推荐）<br>
+    共 18 个问题，约需 5 分钟
+  </p>
+</div>
+
+<!-- ============ 题目屏 ============ -->
+<div id="quiz-screen" class="screen">
+  <div class="quiz-header">
+    <span class="phase-label" id="phase-label">粗筛</span>
+    <span class="progress-text" id="progress-text">1 / 18</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  <h2 class="question-text" id="question-text"></h2>
+  <div class="options" id="options"></div>
+</div>
+
+<!-- ============ 结果屏 ============ -->
+<div id="result-screen" class="screen">
+  <div class="result-summary">
+    <div class="side-badge" id="side-badge"></div>
+    <div class="faction-badge" id="faction-badge"></div>
+  </div>
+
+  <div class="top-card-wrap">
+    <h3>★ 你的特性卡</h3>
+    <div id="top-card"></div>
+  </div>
+
+  <h3 class="alt-title">同派系备选</h3>
+  <div class="alt-cards" id="alt-cards"></div>
+
+  <details class="dim-vector">
+    <summary>查看你的人格指纹（6 维向量）</summary>
+    <div class="dim-display" id="dim-display"></div>
+    <div class="dim-explain">
+      <h4>这 6 个维度是什么？</h4>
+      <ul>
+        <li><b>进攻欲 AG</b>：主动出击 vs. 被动等待。高 AG 偏向直接施压。</li>
+        <li><b>规划深度 PL</b>：长期布局 vs. 临场应变。高 PL 喜欢多回合铺设。</li>
+        <li><b>信息控制 IN</b>：掌握/隐藏信息 vs. 凭实力硬碰。高 IN 善于欺骗与谍报。</li>
+        <li><b>风险偏好 RI</b>：高方差爆发 vs. 稳定推进。高 RI 偏好一击致命。</li>
+        <li><b>格局规模 SC</b>：庞大引擎 vs. 小巧精准。高 SC 喜欢做大盘面。</li>
+        <li><b>精巧度 FN</b>：花式连招 vs. 简单直接。高 FN 享受组合技。</li>
+      </ul>
+    </div>
+  </details>
+
+  <div class="actions">
+    <button class="btn-primary" onclick="restart()">重新测试</button>
+  </div>
+</div>
+
+</div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   维度索引: 0=进攻 1=规划 2=信息 3=风险 4=规模 5=精巧
+   ========================================================= */
+const DIM_KEYS = ["AG","PL","IN","RI","SC","FN"];
+const DIM_NAMES = { AG:"进攻欲", PL:"规划深度", IN:"信息控制", RI:"风险偏好", SC:"格局规模", FN:"精巧度" };
+// 各维度在 Q10-Q18 中的理论最大累计分（用于把玩家向量归一化到 0-3，与卡牌指纹同尺度）
+const DIM_MAX  = { AG:9, PL:9, IN:12, RI:6, SC:9, FN:9 };
+
+const SIDE_NAMES = { C:"公司方 CORP", R:"潜袭者方 RUNNER" };
+const FACTION_NAMES = {
+  HB:"哈斯生化 Haas-Bioroid",
+  JI:"人间会社 Jinteki",
+  NB:"网际传媒 NBN",
+  WE:"威兰财团 Weyland Consortium",
+  AN:"反叛者 Anarch",
+  CR:"逆法者 Criminal",
+  SH:"塑造者 Shaper"
+};
+const CORP_FACTIONS = ["HB","JI","NB","WE"];
+const RUNNER_FACTIONS = ["AN","CR","SH"];
+
+/* =========================================================
+   18 道题
+   ========================================================= */
+const QUESTIONS = [
+// === Q1-Q4 粗筛（仅 side） ===
+{ phase:"粗筛", text:"在你眼里，网络空间到底是什么？", options:[
+  { text:"它是文明的基础设施——必须由有责任感的组织来维持秩序，否则一切都会崩溃。", side:{C:4} },
+  { text:"它是一面镜子——把人最深处的欲望、恐惧和秘密都映出来；理解它的人才掌握真相。", side:{C:3,R:1} },
+  { text:"它是一片未被驯服的疆域——属于敢于探索的人，规则是用来重写的。", side:{R:4} },
+  { text:"它只是工具——谁能从中拿到自己想要的东西，谁就赢了。", side:{C:1,R:3} },
+]},
+{ phase:"粗筛", text:"面对一道牢不可破的防火墙，你的第一反应是？", options:[
+  { text:"我不会让自己处在那个位置——防火墙是我部署给别人的，不是我面对的。", side:{C:4} },
+  { text:"研究它的子进程结构，造一把专门为它设计的破墙程序，然后一次性拆掉。", side:{C:1,R:3} },
+  { text:"找它的侧门——绕过、骗过、用资源压过去，正面硬刚是最笨的选择。", side:{C:2,R:2} },
+  { text:"直接冲过去，扛住伤害也要拆——拆得越多，对面越痛。", side:{R:4} },
+]},
+{ phase:"粗筛", text:"你拿到一笔意外的资源，会怎么用？", options:[
+  { text:"存起来，按计划在最关键的回合一次性投入——节奏比数额重要。", side:{C:4} },
+  { text:"立刻投进长期建设——多铺一层基础，未来收益会几何级放大。", side:{C:3,R:1} },
+  { text:"留着当应变金——等对手露出破绽再精准出手。", side:{C:1,R:3} },
+  { text:"马上花掉——机会窗口不等人，资源放着就是浪费。", side:{R:4} },
+]},
+{ phase:"粗筛", text:"如果游戏的核心乐趣只能选一个，你选哪个？", options:[
+  { text:"设局——让对手以为我什么都没准备，等他读取的瞬间才发现一切都是陷阱。", side:{C:4} },
+  { text:"运营——一砖一瓦把帝国建起来，每个回合都比上一回合更强。", side:{C:3,R:1} },
+  { text:"解谜——每一次读取远程服务器都像翻开一张未知的牌，惊喜本身就是奖励。", side:{C:1,R:3} },
+  { text:"造反——把对面精心搭起来的一切砸碎，那种破坏感无可替代。", side:{R:4} },
+]},
+
+// === Q5-Q9 派系（仅 factions） ===
+{ phase:"派系", text:"你最享受的打牌节奏是？", options:[
+  { text:"闪电战——前几回合就把胜负锁定，对手反应过来就晚了。", factions:{NB:3, CR:2} },
+  { text:"建立、加速、收割——前期铺设引擎，中后期一波带走。", factions:{HB:3, SH:2} },
+  { text:"稳如磐石——慢慢拖、慢慢压，让对手在我的节奏里窒息。", factions:{WE:3, AN:2, SH:1} },
+  { text:"见招拆招——节奏是回应出来的，不是计划出来的。", factions:{JI:2, NB:1, CR:1, AN:1} },
+]},
+{ phase:"派系", text:"钱应该怎么来？", options:[
+  { text:"大手笔操作——一张操作牌带来一笔暴利，简单粗暴。", factions:{WE:3, CR:2, HB:1} },
+  { text:"多管齐下——多个收入渠道同时运转，不依赖任何单一来源。", factions:{NB:2, HB:1, SH:1, CR:1} },
+  { text:"让对手为我付出——他每动一下，我就赚一笔。", factions:{JI:3, AN:2, CR:1} },
+  { text:"核心引擎自我循环——找到一台印钞机，剩下的交给时间。", factions:{HB:3, SH:2} },
+]},
+{ phase:"派系", text:"你怎么看待\"让对手付代价\"？", options:[
+  { text:"直接砸——把他手里、桌上的东西砸碎，没了就是没了。", factions:{WE:3, AN:3} },
+  { text:"吓住他——让他不敢做某件事，比让他做了某件事再罚他更高级。", factions:{JI:2, NB:1, CR:1, AN:1, WE:1} },
+  { text:"不主动施压——靠盘面强度让他自己崩溃。", factions:{HB:3, SH:2} },
+  { text:"设陷阱——让他自己踩进去，比我亲手打他还痛。", factions:{JI:3, CR:2, SH:1} },
+]},
+{ phase:"派系", text:"面对\"未知信息\"，你的态度？", options:[
+  { text:"我制造未知——让对手永远不知道哪张牌是议案、哪张是炸弹。", factions:{JI:3, CR:2} },
+  { text:"我先看清再动——不打无准备之仗，预读、过牌、规划。", factions:{HB:2, JI:1, SH:2} },
+  { text:"强行揭穿——把他藏起来的所有东西都翻出来，一张张拍在桌面上。", factions:{WE:2, NB:2, AN:2, SH:1} },
+  { text:"信息无所谓——我只看结果，胜负在节奏不在谍报。", factions:{NB:3, AN:1, CR:1, SH:1} },
+]},
+{ phase:"派系", text:"你最不能接受的输法是哪种？", options:[
+  { text:"输给运气——掀牌掀到我没办法，比死还难受。", factions:{HB:3, SH:2} },
+  { text:"输给一个比我聪明的人——这是侮辱，不是失败。", factions:{JI:2, NB:1, CR:2} },
+  { text:"被规则限制住——不是对手太强，是系统不让我赢。", factions:{WE:3, AN:2, SH:1} },
+  { text:"赢得不漂亮——哪怕赢了，也想赢得让对手心服口服。", factions:{NB:3, SH:1, CR:1, WE:1} },
+]},
+
+// === Q10-Q18 身份（仅 dims，索引 0-5） ===
+{ phase:"身份", text:"当你的盘面终于占据上风，你最想做什么？", options:[
+  { text:"立刻收紧绞索——这是结束游戏的窗口，一波带走，不给对手翻盘机会。", dims:{AG:3} },
+  { text:"把这一波当成跳板——用现在的优势铺一个更大的局。", dims:{AG:1, PL:3} },
+  { text:"先观察对手反应——确认他怎么应对，再决定下一步。", dims:{AG:2, PL:2} },
+  { text:"按原计划继续走——一时占优不代表能赢，稳就是赢。", dims:{PL:2} },
+]},
+{ phase:"身份", text:"你愿意为了一次大爆发承担多大风险？", options:[
+  { text:"全押——爆点足够大，输了也认。", dims:{RI:3} },
+  { text:"设个圈套——让对手以为我没准备，他踩进来我就赢。", dims:{RI:1, IN:3} },
+  { text:"风险与隐藏并重——藏起底牌，等他露破绽再爆。", dims:{RI:2, IN:2} },
+  { text:"绝不冒险——所有信息都摊开，凭实力推过去。", dims:{IN:1} },
+]},
+{ phase:"身份", text:"你想要的胜利画面是？", options:[
+  { text:"一座堡垒——每张牌都在协同，整个盘面密不透风。", dims:{SC:3, FN:1} },
+  { text:"一记神操作——三四张牌串成一个连招，对手目瞪口呆。", dims:{SC:1, FN:3} },
+  { text:"庞大且优雅——既铺得开又打得巧。", dims:{SC:2, FN:2} },
+  { text:"简单直接——一拳打死，不需要花活。", dims:{SC:1} },
+]},
+{ phase:"身份", text:"面对不知道是议案还是陷阱的远程服务器，你？", options:[
+  { text:"冲进去再说——信息是打出来的，不是猜出来的。", dims:{AG:3} },
+  { text:"先观察——他在保护什么、什么时候推进、信用流怎么走。", dims:{AG:1, IN:3} },
+  { text:"声东击西——做出要冲的样子，看他怎么反应。", dims:{AG:2, IN:2} },
+  { text:"直接放弃这个服务器——不进不亏，他得自己来用。", dims:{IN:1} },
+]},
+{ phase:"身份", text:"你最想要的底牌是？", options:[
+  { text:"一张终结牌——平时藏着，关键回合一击致命。", dims:{RI:3} },
+  { text:"一整套引擎——慢慢搭起来，到位后每回合都强。", dims:{SC:3} },
+  { text:"多点开花——好几个备选方案，对手堵不完。", dims:{RI:1, SC:2} },
+  { text:"意想不到的连击——单张普通，组合恐怖。", dims:{RI:2, SC:1} },
+]},
+{ phase:"身份", text:"牌组构筑时你最在意什么？", options:[
+  { text:"每张牌的精确角色——不放任何\"凑数\"牌。", dims:{PL:3, FN:1} },
+  { text:"奇思妙想的联动——发现别人没发现的组合。", dims:{PL:1, FN:3} },
+  { text:"稳定与爆点平衡——既能跑流程也能起飞。", dims:{PL:2, FN:2} },
+  { text:"简单可靠——经典套路最不容易出错。", dims:{PL:1} },
+]},
+{ phase:"身份", text:"你的攻击美学更接近？", options:[
+  { text:"重锤——一拳打到底，干净利落，对手没机会站起来。", dims:{AG:3} },
+  { text:"连击——几张牌串起一个对手没见过的组合，看他懵在那里。", dims:{AG:1, FN:3} },
+  { text:"多面进攻——左边压、右边骗、中间藏，让他顾此失彼。", dims:{AG:2, FN:2} },
+  { text:"不需要攻击——盘面到位，对手自己会输。", dims:{FN:1} },
+]},
+{ phase:"身份", text:"在你搭牌组的时候，你最先想清楚的是？", options:[
+  { text:"整张牌组的胜利路径——每张牌为哪一回合服务，清清楚楚。", dims:{PL:3, IN:1} },
+  { text:"怎么让对手猜不到我的下一步——欺骗才是最强的防御。", dims:{PL:1, IN:3} },
+  { text:"核心引擎 + 应变层——既有计划也有惊喜。", dims:{PL:2, IN:2} },
+  { text:"直觉就行——好牌堆一起，凭手感打。", dims:{} },
+]},
+{ phase:"身份", text:"胜利该有多大声？", options:[
+  { text:"悄无声息——对手输了都不知道是怎么输的。", dims:{IN:3} },
+  { text:"金光万丈——一座完整的帝国/网络在桌面上展开，无可撼动。", dims:{SC:3} },
+  { text:"明暗交织——既有看得见的强势，也有看不见的杀招。", dims:{IN:2, SC:2} },
+  { text:"不在乎声音——赢就行了，过程不重要。", dims:{IN:1, SC:1} },
+]},
+];
+
+/* =========================================================
+   46 张特性卡（指纹 fp 顺序: AG, PL, IN, RI, SC, FN）
+   name 字段为占位描述名——如果与你的官方列表不符，直接修改 name/nameEn 即可。
+   ========================================================= */
+const CARDS = [
+  // —— 哈斯生化 HB (#2-7) ——
+  { id:2,  fc:"HB", fp:[1,2,1,0,3,1], name:"哈斯生化：精密设计", nameEn:"Haas-Bioroid: Precision Design",       blurb:"HB 把\"精密\"奉为信仰——每一颗螺丝都被预演十万次，让\"完美\"成为可量产的工业品。" },
+  { id:3,  fc:"HB", fp:[2,1,2,1,1,3], name:"幻镜所：无尽迭代", nameEn:"MirrorMorph: Endless Iteration",        blurb:"把镜面无限叠映——产品的每一次迭代都映出下一版的雏形，永不完成的追求。" },
+  { id:4,  fc:"HB", fp:[3,1,0,2,2,1], name:"图勒海底城：水下安全区", nameEn:"Thule Subsea: Safety Below",             blurb:"阳光照不到的海底——HB 把人类生存空间推向极端，\"安全\"是要用神经元交换的奢侈品。" },
+  { id:5,  fc:"HB", fp:[1,3,1,0,2,1], name:"雷霆军工厂：以武止戈", nameEn:"Thunderbolt Armaments: Peace Through Power",        blurb:"HB 军工部——它出售的不是和平，而是让和平成为唯一选项的威慑力。" },
+  { id:6,  fc:"HB", fp:[2,1,1,3,1,2], name:"利奥建工：劳工解决方案", nameEn:"LEO Construction: Labor Solutions",       blurb:"劳工解决方案的潜台词——人是最便宜也最易替换的零件。" },
+  { id:7,  fc:"HB", fp:[1,2,3,1,1,2], name:"珀依诗奢品：风靡万世", nameEn:"Poétrï Luxury Brands: All the Rage",        blurb:"奢侈品的本质是稀缺——HB 把\"被仰望\"贩卖成商品，让你为\"想要\"本身买单。" },
+
+  // —— 人间会社 Jinteki (#8-14) ——
+  { id:8,  fc:"JI", fp:[3,1,1,2,1,1], name:"人间会社：修复人性", nameEn:"Jinteki: Restoring Humanity",      blurb:"以基因复原\"完整的人\"——但你修复的，到底是人性，还是公司想要的样子？" },
+  { id:9,  fc:"JI", fp:[2,1,3,1,1,2], name:"兵部学会：通彻明晰", nameEn:"Hyoubu Institute: Absolute Clarity",  blurb:"兵部的座右铭是\"先知后动\"——把对手所有秘密变成自己手中的牌。" },
+  { id:10, fc:"JI", fp:[1,2,3,1,1,1], name:"伊雪克适应体：维持多样性",   nameEn:"Issuaq Adaptics: Sustaining Diversity",  blurb:"北极冻土带的基因实验室——多样性不是道德选择，而是生存策略。" },
+  { id:11, fc:"JI", fp:[3,1,1,1,2,0], name:"密网：知识产权回收", nameEn:"A Teia: IP Recovery",     blurb:"在权力被收割殆尽的世界里，A Teia 像一张地下蛛网——一个节点，连结所有反抗。" },
+  { id:12, fc:"JI", fp:[1,1,2,1,1,3], name:"傲金公司：克隆体的黄金标准", nameEn:"AU Co.: The Gold Standard in Clones",   blurb:"把\"我\"做成商品的品牌——你的脸、你的笑声、你的回忆都已注册商标。" },
+  { id:13, fc:"JI", fp:[2,0,1,3,1,2], name:"丝链有限公司：生命基石", nameEn:"PT Untaian: Life's Building Blocks",    blurb:"印尼丝链——把生命拆成可订购的基础元件，再以更便宜的价格回卖给你。" },
+  { id:14, fc:"JI", fp:[2,1,2,1,3,0], name:"梅里爱大学：精英汇聚", nameEn:"Méliès U: Only the Brightest",      blurb:"你被录取了——但条款里没写：毕业后你属于谁。" },
+
+  // —— 网际传媒 NBN (#15-21) ——
+  { id:15, fc:"NB", fp:[3,1,2,2,1,1], name:"网际传媒：身临其境", nameEn:"NBN: Reality Plus",       blurb:"现实即广告，广告即现实——NBN 把\"沉浸\"包装成你与生俱来的本能。", banned:true },
+  { id:16, fc:"NB", fp:[1,3,2,0,2,1], name:"游网：美梦成真", nameEn:"GameNET: Where Dreams are Real",       blurb:"在 GameNET 的世界里，痛觉是付费内容——而你的尖叫是别人的实况精彩集锦。" },
+  { id:17, fc:"NB", fp:[2,0,1,3,2,1], name:"真理咨询：政治解决方案", nameEn:"Pravdivost Consulting: Political Solutions",    blurb:"政治顾问从不讲真话——他们让真话变成无人在意的旧闻。" },
+  { id:18, fc:"NB", fp:[1,2,3,0,2,2], name:"超绝分析：消除国界", nameEn:"Epiphany Analytica: Nations Undivided",    blurb:"消除国界的慷慨表象之下——是 Epiphany 把每一个\"我\"打包成可贩卖的人口画像。" },
+  { id:19, fc:"NB", fp:[3,1,1,1,1,2], name:"星云人才：制造明星", nameEn:"Nebula Talent Management: Making Stars",    blurb:"明星不是被发现的，而是被制造出来的——舞台从不缺替身。" },
+  { id:20, fc:"NB", fp:[1,2,1,0,3,1], name:"突触环球：先你所想", nameEn:"Synapse Global: Faster than Thought", blurb:"在你想到之前就已经付完了款——NBN 把广告投到了你大脑的前额叶。" },
+  { id:21, fc:"NB", fp:[1,1,2,1,2,3], name:"编辑部：归于虚无", nameEn:"Editorial Division: Ad Nihilum",       blurb:"编辑部的笔尖比律师快——你读过的每条新闻，都已经被删过三遍。" },
+
+  // —— 威兰财团 Weyland (#22-27) ——
+  { id:22, fc:"WE", fp:[3,1,0,2,2,1], name:"威兰财团：建造不朽",         nameEn:"Weyland Consortium: Built to Last",    blurb:"钢铁与混凝土同样厚重——Weyland 用钱浇筑世界，让自己的名字写进每一面墙。" },
+  { id:23, fc:"WE", fp:[2,2,1,0,3,1], name:"地球站：空梯管理局总部",       nameEn:"Earth Station: SEA Headquarters",     blurb:"从地表到轨道的电梯——SEA 是世界唯一的\"上升通道\"，但票价已远超你能支付。" },
+  { id:24, fc:"WE", fp:[3,1,2,1,1,1], name:"鄂毕超重型物流：采出 运出 杰出",     nameEn:"Ob Superheavy Logistics: Extract. Export. Excel.",    blurb:"俄罗斯西伯利亚重工——他们采的是矿，运的是钢，输出的是把任何破坏都变成下一波生产的工业能力。" },
+  { id:25, fc:"WE", fp:[2,3,1,2,1,1], name:"纽文股份有限公司：土地之法",     nameEn:"Nuvem SA: Law of the Land",   blurb:"在 Nuvem 的版图里，\"土地\"不是脚下的泥——是执法权、产权与开火权的合一。" },
+  { id:26, fc:"WE", fp:[2,1,0,3,2,1], name:"邦贡工团：灾害突临之时",         nameEn:"BANGUN: When Disaster Strikes",   blurb:"印尼的工程团队——他们建的不只是大坝，更是确保大坝在该垮的时候按计划垮塌的剧本。" },
+  { id:27, fc:"WE", fp:[1,2,1,1,1,3], name:"茨维基集团：无形之手",   nameEn:"The Zwicky Group: Invisible Hands",      blurb:"这个集团从不出现在董事会名单上——但每一位董事都为它工作。" },
+
+  // —— 反叛者 Anarch (#29-34) ——
+  { id:29, fc:"AN", fp:[3,1,0,2,2,1], name:"勒内·“野狼”·阿斯蒙特：派对野兽",   nameEn:"René “Loup” Arcemont: Party Animal",        blurb:"野狼不会因被通缉而停下脚步——他只会把通缉令贴在自家门上当装饰。" },
+  { id:30, fc:"AN", fp:[2,2,1,3,1,2], name:"白 星子：未名主演",   nameEn:"Hoshiko Shiro: Untold Protagonist",         blurb:"真名永远埋在标签下——白 星子用每一次冲锋为自己起一个新名字。", banned:true },
+  { id:31, fc:"AN", fp:[3,0,1,2,2,1], name:"艾萨·阿方托夫：生态起义者",   nameEn:"Esâ Afontov: Eco-Insurrectionist",     blurb:"地球被资本榨干前——他们要先把企业的中枢撕成碎片。" },
+  { id:32, fc:"AN", fp:[1,3,0,1,2,2], name:"塞巴斯蒂昂·索萨·佩索阿：激进分子组织者", nameEn:"Sebastião Souza Pessoa: Activist Organizer",  blurb:"他的每一面旗帜都是亲手缝出来的——被通缉本身就是最响亮的勋章。" },
+  { id:33, fc:"AN", fp:[2,1,0,2,3,0], name:"大野·“凤凰”·燎：烬中再起",   nameEn:"Ryō “Phoenix” Ōno: Out of the Ashes",       blurb:"从废墟中升起的人，比未燃过的人更知道火能熔化什么。" },
+  { id:34, fc:"AN", fp:[2,1,2,1,1,3], name:"托潘：民间组织领袖",   nameEn:"Topan: Ormas Leader",        blurb:"Ormas 是印尼的民间互助会——但当国家对你关上所有门，互助会便成了革命的种子。" },
+
+  // —— 逆法者 Criminal (#35-41) ——
+  { id:35, fc:"CR", fp:[2,0,2,3,1,1], name:"扎赫亚·萨迪吉：多才多艺的走私者",   nameEn:"Zahya Sadeghi: Versatile Smuggler",      blurb:"走私不是把货搬过边境，而是把边境搬开——Zahya 走过的路从此不算违法。" },
+  { id:36, fc:"CR", fp:[2,1,3,1,1,2], name:"阿兹·麦卡弗瑞：机械奇才",   nameEn:"Az McCaffrey: Mechanical Prodigy",      blurb:"天生的机械神童——但他真正修好的，永远是那些和机器一起活下来的人。" },
+  { id:37, fc:"CR", fp:[3,0,1,2,1,1], name:"纽纱·“黑貂”·辛塔什塔：交响奇才",   nameEn:"Nyusha “Sable” Sintashta: Symphonic Prodigy",    blurb:"交响乐的指挥永远只挥第一拍——剩下的，整支乐队都听她的。", banned:true },
+  { id:38, fc:"CR", fp:[1,2,3,0,2,1], name:"墨丘利：铬金解放者",   nameEn:"Mercury: Chrome Libertador",        blurb:"墨丘利是众神的信使——他不破门，他从门缝里溜过去。" },
+  { id:39, fc:"CR", fp:[3,1,2,1,0,1], name:"巴里·“巴兹”·王：三和党老江湖",       nameEn:"Barry “Baz” Wong: Tri-Maf Veteran",     blurb:"三和党的老人不靠拳头说话——他们靠的是\"我认识谁\"。" },
+  { id:40, fc:"CR", fp:[1,3,2,0,1,2], name:"穆斯莉哈特：多面营销专家",   nameEn:"MuslihaT: Multifarious Marketeer",     blurb:"\"多面\"不是伪装——是同时活着的多个真实自己。" },
+  { id:41, fc:"CR", fp:[1,1,1,1,2,3], name:"虚拟智能私家侦探：“你可以叫我维克”",   nameEn:"Virtual Intelligence, P.I.: “You Can Call Me Vic”",    blurb:"维克不是人——他是住在网络深处的\"私家侦探\"程序，靠破解每一桩骗局活下去。" },
+
+  // —— 塑造者 Shaper (#42-48) ——
+  { id:42, fc:"SH", fp:[1,2,1,0,3,2], name:"涛·萨隆加：网真魔术师",   nameEn:"Tāo Salonga: Telepresence Magician",          blurb:"远在千里之外仍能扼住你的喉咙——Shaper 优雅暴力的极致。" },
+  { id:43, fc:"SH", fp:[1,3,1,0,2,2], name:"拉特：正派自由职业者",   nameEn:"Lat: Ethical Freelancer",      blurb:"自由职业者的伦理是——只要双方都还能继续，那就还能继续；不让任何一边输得太快。" },
+  { id:44, fc:"SH", fp:[1,3,2,1,2,0], name:"帕德玛·伊斯比斯特船长：无畏探索者",   nameEn:"Captain Padma Isbister: Intrepid Explorer",    blurb:"船长的航海日志里没有\"已知海域\"——只要还没去过，都值得放下锚。" },
+  { id:45, fc:"SH", fp:[1,1,1,2,1,3], name:"阿里萨娜·罗查·纳胡：街头艺术家",   nameEn:"Arissana Rocha Nahu: Street Artist",       blurb:"街头艺术的核心是——一次性的，不为收藏，为震撼那一秒钟。" },
+  { id:46, fc:"SH", fp:[3,1,0,2,1,2], name:"德薇·苏布罗托普特里：教学引戏人",   nameEn:"Dewi Subrotoputri: Pedagogical Dhalang",        blurb:"Dhalang 是爪哇皮影戏的引戏人——她不在台上，但所有人物的命运都握在她手中。" },
+  { id:47, fc:"SH", fp:[1,2,1,1,1,3], name:"玛格达琳·凯诺-切穆泰：幕后建筑师", nameEn:"Magdalene Keino-Chemutai: Cryptarchitect",       blurb:"Cryptarchitect 不画图纸——她直接画进现实里，让加密的结构成为可居住的空间。" },
+  { id:48, fc:"SH", fp:[2,1,0,2,3,1], name:"海勒姆·“〇除”·斯文森：往日之影",   nameEn:"Hiram “0mission” Svensson: Shadow of the Past",     blurb:"海勒姆带着零号补丁活下来——他的每一段记忆都是被删除却又粘回来的，所以他比任何人都更懂遗忘的代价。" },
+];
+
+/* =========================================================
+   每张卡的"被抽中概率"——基于 200,000 次蒙特卡洛仿真
+   （respondent 对每题均匀随机选 1 / 4，得到的全局百分比）
+   ========================================================= */
+const CARD_PROB = {
+   2:2.71, 3:2.28, 4:1.53, 5:1.44, 6:4.45, 7:3.70,
+   8:3.14, 9:1.07,10:3.79,11:0.87,12:3.13,13:1.04,14:1.28,
+  15:2.84,16:1.58,17:1.08,18:0.64,19:1.41,20:1.51,21:2.64,
+  22:0.55,23:2.02,24:2.18,25:2.95,26:0.90,27:3.08,
+  29:0.94,30:5.01,31:1.08,32:2.90,33:0.51,34:4.03,
+  35:2.21,36:2.87,37:1.57,38:2.40,39:0.76,40:2.10,41:4.91,
+  42:2.24,43:0.76,44:3.06,45:3.52,46:1.64,47:2.17,48:1.56
+};
+
+/* =========================================================
+   状态管理
+   ========================================================= */
+const state = {
+  idx: 0,                         // 当前题号
+  side:    {C:0, R:0},
+  factions:{HB:0, JI:0, NB:0, WE:0, AN:0, CR:0, SH:0},
+  dims:    {AG:0, PL:0, IN:0, RI:0, SC:0, FN:0},
+};
+
+function resetState() {
+  state.idx = 0;
+  state.side = {C:0, R:0};
+  state.factions = {HB:0, JI:0, NB:0, WE:0, AN:0, CR:0, SH:0};
+  state.dims = {AG:0, PL:0, IN:0, RI:0, SC:0, FN:0};
+}
+
+/* =========================================================
+   屏幕切换
+   ========================================================= */
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  window.scrollTo({top:0, behavior:"instant"});
+}
+
+/* =========================================================
+   流程
+   ========================================================= */
+function start() {
+  resetState();
+  showScreen("quiz-screen");
+  showQuestion(0);
+}
+
+function restart() {
+  resetState();
+  showScreen("title-screen");
+}
+
+function showQuestion(i) {
+  state.idx = i;
+  const q = QUESTIONS[i];
+  document.getElementById("phase-label").textContent = q.phase;
+  document.getElementById("progress-text").textContent = (i+1) + " / " + QUESTIONS.length;
+  document.getElementById("progress-fill").style.width = ((i) / QUESTIONS.length * 100) + "%";
+  document.getElementById("question-text").textContent = (i+1) + ". " + q.text;
+  const optsEl = document.getElementById("options");
+  optsEl.innerHTML = "";
+  const labels = ["A","B","C","D"];
+  q.options.forEach((opt, oi) => {
+    const div = document.createElement("div");
+    div.className = "option";
+    div.innerHTML = '<span class="opt-mark">' + labels[oi] + '</span>' + escapeHtml(opt.text);
+    div.onclick = () => selectOption(opt);
+    optsEl.appendChild(div);
+  });
+}
+
+function selectOption(opt) {
+  // 累加权重
+  if (opt.side)     for (const k in opt.side)     state.side[k]     = (state.side[k]||0)     + opt.side[k];
+  if (opt.factions) for (const k in opt.factions) state.factions[k] = (state.factions[k]||0) + opt.factions[k];
+  if (opt.dims)     for (const k in opt.dims)     state.dims[k]     = (state.dims[k]||0)     + opt.dims[k];
+
+  // 进入下一题或结算
+  if (state.idx + 1 < QUESTIONS.length) {
+    showQuestion(state.idx + 1);
+  } else {
+    document.getElementById("progress-fill").style.width = "100%";
+    setTimeout(showResult, 200);
+  }
+}
+
+/* =========================================================
+   结算
+   ========================================================= */
+function computeResult() {
+  // 1. 判定 side
+  const side = state.side.C >= state.side.R ? "C" : "R";
+
+  // 2. 判定 faction（在 side 那一侧）
+  const candidates = side === "C" ? CORP_FACTIONS : RUNNER_FACTIONS;
+  let bestFc = candidates[0], bestFcScore = -1;
+  candidates.forEach(fc => {
+    if (state.factions[fc] > bestFcScore) {
+      bestFcScore = state.factions[fc];
+      bestFc = fc;
+    }
+  });
+
+  // 3. 玩家 6 维向量（归一化到 0-3 与卡牌指纹同尺度）
+  const v = DIM_KEYS.map(k => (state.dims[k] || 0) / DIM_MAX[k] * 3);
+
+  // 4. 计算到 faction 内每张卡的欧氏距离
+  const cards = CARDS.filter(c => c.fc === bestFc);
+  const scored = cards.map(c => ({
+    card: c,
+    dist: Math.sqrt(v.reduce((acc, vi, i) => acc + Math.pow(vi - c.fp[i], 2), 0))
+  }));
+  scored.sort((a,b) => a.dist - b.dist);
+
+  return {
+    side, faction: bestFc, vector: v,
+    top: scored[0].card,
+    alts: scored.slice(1, 3).map(s => s.card)  // 备选最多 2 张
+  };
+}
+
+/* =========================================================
+   渲染结果
+   ========================================================= */
+function showResult() {
+  const r = computeResult();
+  showScreen("result-screen");
+
+  // 顶部摘要
+  const sideEl = document.getElementById("side-badge");
+  sideEl.textContent = SIDE_NAMES[r.side];
+  sideEl.className = "side-badge " + (r.side === "C" ? "corp" : "runner");
+
+  const fcEl = document.getElementById("faction-badge");
+  fcEl.textContent = FACTION_NAMES[r.faction];
+  fcEl.style.color = "var(--" + r.faction + ")";
+
+  // 主推荐卡
+  document.getElementById("top-card").innerHTML = renderCard(r.top, "top");
+
+  // 备选卡
+  const altsEl = document.getElementById("alt-cards");
+  altsEl.innerHTML = "";
+  if (r.alts.length === 0) {
+    altsEl.innerHTML = '<div style="color:#888;text-align:center;padding:20px;">此派系仅 1 张特性卡。</div>';
+  } else {
+    r.alts.forEach(c => altsEl.insertAdjacentHTML("beforeend", renderCard(c, "alt")));
+  }
+
+  // 玩家指纹
+  renderDimDisplay(r.vector);
+}
+
+function renderCard(c, mode) {
+  const imgPath = "卡图/" + c.id + ".png";
+  const banLabel = c.banned ? '<span class="card-banned">26.05 禁牌</span>' : '';
+  const prob = CARD_PROB[c.id];
+  const probLabel = (prob !== undefined)
+    ? '<span class="card-prob' + (prob < 1 ? ' rare' : '') + '">P ' + prob.toFixed(2) + '%</span>'
+    : '';
+
+  if (mode === "top") {
+    let fpHtml = "";
+    DIM_KEYS.forEach((k, i) => {
+      fpHtml += '<span class="fp-label">' + DIM_NAMES[k] + '</span>'
+              + '<div class="fp-bar"><div class="fp-fill" style="width:' + (c.fp[i] / 3 * 100) + '%"></div></div>'
+              + '<span class="fp-val">' + c.fp[i] + '/3</span>';
+    });
+    return '<div class="card-display">'
+         + '  <div class="card-image-wrap">'
+         + '    <img src="' + imgPath + '" alt="#' + c.id + '" '
+         + '         onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\';">'
+         + '    <div class="card-image-fallback" style="display:none;">'
+         + '      图片未找到<br>预期路径：<br>' + imgPath
+         + '    </div>'
+         + '  </div>'
+         + '  <div class="card-info">'
+         + '    <div class="card-name">#' + c.id + ' ' + escapeHtml(c.name) + banLabel + probLabel + '</div>'
+         + '    <div class="card-name-en">' + escapeHtml(c.nameEn) + '</div>'
+         + '    <div class="card-fp">' + fpHtml + '</div>'
+         + '    <div class="card-blurb">' + escapeHtml(c.blurb) + '</div>'
+         + '  </div>'
+         + '</div>';
+  }
+  // alt 模式
+  return '<div class="alt-card">'
+       + '  <div class="alt-card-img">'
+       + '    <img src="' + imgPath + '" alt="#' + c.id + '" '
+       + '         onerror="this.style.display=\'none\';">'
+       + '  </div>'
+       + '  <div class="alt-card-info">'
+       + '    <div class="card-name">#' + c.id + ' ' + escapeHtml(c.name) + banLabel + probLabel + '</div>'
+       + '    <div class="card-name-en">' + escapeHtml(c.nameEn) + '</div>'
+       + '    <div class="alt-tag">' + escapeHtml(c.blurb) + '</div>'
+       + '  </div>'
+       + '</div>';
+}
+
+function renderDimDisplay(v) {
+  const el = document.getElementById("dim-display");
+  el.innerHTML = "";
+  DIM_KEYS.forEach((k, i) => {
+    // v 已归一化到 0-3
+    const pct = Math.min(100, v[i] / 3 * 100);
+    el.insertAdjacentHTML("beforeend",
+      '<span class="fp-label">' + DIM_NAMES[k] + '</span>'
+      + '<div class="fp-bar"><div class="fp-fill" style="width:' + pct + '%"></div></div>'
+      + '<span class="fp-val">' + v[i].toFixed(1) + '/3</span>'
+    );
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+</script>
+</body>
+</html>
